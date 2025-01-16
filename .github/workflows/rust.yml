@@ -1,0 +1,43 @@
+name: Independent Rust Files Build and Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Locate Rust Files
+        id: rust_files
+        run: |
+          # Find all .rs files in the repository
+          $files = Get-ChildItem -Recurse -Filter "*.rs"
+          $files | ForEach-Object { Write-Host $_.FullName }
+          echo "::set-output name=files::$(echo $files | ForEach-Object { $_.FullName } -join ',')"
+        shell: pwsh
+
+      - name: Compile and Run Each Rust File
+        run: |
+          IFS=',' read -r -a files <<< "${{ steps.rust_files.outputs.files }}"
+          for file in "${files[@]}"; do
+            echo "Processing $file"
+            rustc "$file" -o output.exe || exit 1
+            ./output.exe || exit 1
+          done
+        shell: bash
